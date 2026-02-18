@@ -111,31 +111,6 @@ La aplicación se abrirá en tu navegador predeterminado (generalmente en `http:
    - Resumen de ganancias netas
    - Monto de ISR e IVA
 
-## 🌐 Despliegue en Streamlit Cloud
-
-Para desplegar esta aplicación en **Streamlit Cloud** (servicio gratuito):
-
-### Pasos para desplegar:
-
-1. **Despecha push de tus cambios a GitHub:**
-```bash
-git add .
-git commit -m "Agregar calculadora de costos con Plotly"
-git push origin main
-```
-
-2. **Ve a [Streamlit Community Cloud](https://streamlit.io/cloud)**
-
-3. **Crea una cuenta (gratuita)** o inicia sesión con tu cuenta de GitHub
-
-4. **Haz clic en "New app"** y selecciona:
-   - **Repository:** `waltgarcia/cuantocuesta`
-   - **Branch:** `main`
-   - **Main file path:** `streamlit_app.py`
-
-5. **¡Listo!** El app se desplegará automáticamente en una URL pública como:
-   ```
-   https://cuantocuesta.streamlit.app
    ```
 
 ### Compartir tu app:

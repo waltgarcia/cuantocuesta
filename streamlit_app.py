@@ -21,6 +21,21 @@ COLORES = {
 
 st.markdown(f"<style>.main {{ background-color: {COLORES['fondo']}; }}</style>", unsafe_allow_html=True)
 
+PERIODOS_ISR = ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"]
+
+REGIMENES_ISR = {
+    "Régimen General (Persona Moral)": {
+        "modo": "fijo",
+        "tasa": 30.0,
+        "descripcion": "Tasa corporativa de ISR sobre utilidad fiscal.",
+    },
+    "Persona Física (Actividad Empresarial)": {
+        "modo": "progresivo",
+        "tasa": None,
+        "descripcion": "Tarifa progresiva del Art. 152 LISR por período.",
+    },
+}
+
 # Inicializar session state
 if 'historial' not in st.session_state:
     st.session_state.historial = []
@@ -91,48 +106,67 @@ def calcular_isr_progresivo(ingreso, periodo):
             return tarifa["cuota"] + ((ingreso - tarifa["limite_inf"]) * tarifa["tasa"] / 100)
     return 0
 
-def calcular_precio(costo_base, porcentaje_utilidad, periodo_isr):
+def calcular_isr(ingreso, regimen, periodo):
+    config = REGIMENES_ISR.get(regimen, REGIMENES_ISR["Persona Física (Actividad Empresarial)"])
+    if config["modo"] == "fijo":
+        return ingreso * (config["tasa"] / 100)
+    return calcular_isr_progresivo(ingreso, periodo)
+
+def calcular_precio(costo_base, porcentaje_utilidad, regimen, periodo_isr):
     utilidad_deseada = costo_base * (porcentaje_utilidad / 100)
     utilidad_ajustada = utilidad_deseada
     for _ in range(10):
-        isr_calc = calcular_isr_progresivo(costo_base + utilidad_ajustada, periodo_isr)
+        isr_calc = calcular_isr(costo_base + utilidad_ajustada, regimen, periodo_isr)
         nuevo_val = utilidad_deseada + isr_calc
         if abs(nuevo_val - utilidad_ajustada) < 0.01:
             break
         utilidad_ajustada = nuevo_val
     
     subtotal = costo_base + utilidad_ajustada
+    isr_final = calcular_isr(subtotal, regimen, periodo_isr)
+    tasa_efectiva = (isr_final / subtotal * 100) if subtotal > 0 else 0
     return {
         "precio_final": subtotal * 1.16,
         "subtotal": subtotal,
         "iva": subtotal * 0.16,
-        "isr": calcular_isr_progresivo(subtotal, periodo_isr),
-        "ganancia": utilidad_deseada
+        "isr": isr_final,
+        "ganancia": utilidad_deseada,
+        "tasa_efectiva": tasa_efectiva,
     }
 
 st.title("💰 Calculadora de Costo Real - SAT 2026")
-st.write("🇲🇽 ISR Progresivo (Art. 152 LISR) | IVA 16%")
+st.write("🇲🇽 ISR por régimen fiscal | IVA 16%")
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 Normal", "🎯 Objetivo", "📈 Dinámica", "📉 Sensibilidad", "🛒 Multi", "⚖️ Equilibrio"])
+with st.sidebar:
+    st.subheader("🧾 Régimen Fiscal")
+    regimen = st.selectbox("Selecciona régimen", list(REGIMENES_ISR.keys()), index=1)
+    if REGIMENES_ISR[regimen]["modo"] == "progresivo":
+        periodo_global = st.selectbox("Período ISR", PERIODOS_ISR, index=4)
+    else:
+        periodo_global = "Mensual"
+        st.caption(f"Tasa ISR fija: {REGIMENES_ISR[regimen]['tasa']}%")
+    st.caption(REGIMENES_ISR[regimen]["descripcion"])
+
+st.caption(f"Régimen activo: {regimen}")
+
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📊 Normal", "🎯 Objetivo", "📈 Dinámica", "📉 Sensibilidad", "🛒 Multi", "⚖️ Equilibrio", "📚 Tablas ISR"])
 
 # TAB 1: CÁLCULO NORMAL
 with tab1:
     st.subheader("Cálculo Normal")
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     with c1:
         costo = st.number_input("💵 Costo ($)", value=700.0, step=10.0)
     with c2:
         util = st.number_input("📈 Utilidad (%)", value=30.0, step=1.0, max_value=200.0)
-    with c3:
-        periodo = st.selectbox("📅 Período", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4)
     
-    res = calcular_precio(costo, util, periodo)
+    res = calcular_precio(costo, util, regimen, periodo_global)
     
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Precio Final", f"${res['precio_final']:,.2f}")
     m2.metric("Ganancia", f"${res['ganancia']:,.2f}")
     m3.metric("ISR", f"${res['isr']:,.2f}")
-    m4.metric("IVA", f"${res['iva']:,.2f}")
+    m4.metric("IVA", f"${res['iva']:,.2f}", f"ISR efectivo: {res['tasa_efectiva']:.2f}%")
     
     col_hist, col_share = st.columns(2)
     with col_hist:
@@ -158,38 +192,32 @@ with tab1:
 with tab2:
     st.subheader("🎯 Inversor de Fórmula")
     st.write("Precio → Costo Base máximo")
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     with c1:
         precio_obj = st.number_input("💰 Precio deseado", value=1000.0, step=10.0, key="p_obj")
     with c2:
         util_obj = st.number_input("📈 Utilidad", value=30.0, step=1.0, key="u_obj", max_value=200.0)
-    with c3:
-        per_obj = st.selectbox("P", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4, key="per_obj")
     
     if st.button("🔄 Calcular"):
         costo_max = precio_obj / 1.16 * 0.6
         for _ in range(20):
-            res_temp = calcular_precio(costo_max, util_obj, per_obj)
+            res_temp = calcular_precio(costo_max, util_obj, regimen, periodo_global)
             if abs(res_temp['precio_final'] - precio_obj) < 1:
                 break
             costo_max += (precio_obj - res_temp['precio_final']) / 2.16
         
-        res_obj = calcular_precio(costo_max, util_obj, per_obj)
+        res_obj = calcular_precio(costo_max, util_obj, regimen, periodo_global)
         st.metric("Costo Base Máximo", f"${costo_max:,.2f}")
         st.metric("Precio Resultante", f"${res_obj['precio_final']:,.2f}")
 
 # TAB 3: TABLA DINÁMICA
 with tab3:
     st.subheader("📈 Comparativo de Márgenes")
-    c1, c2 = st.columns(2)
-    with c1:
-        costo_tabla = st.number_input("Costo", 700.0, step=10.0, key="t_costo")
-    with c2:
-        per_tabla = st.selectbox("Período", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4, key="t_per")
+    costo_tabla = st.number_input("Costo", 700.0, step=10.0, key="t_costo")
     
     datos = []
     for m in [10, 15, 20, 25, 30, 35, 40, 50]:
-        r = calcular_precio(costo_tabla, m, per_tabla)
+        r = calcular_precio(costo_tabla, m, regimen, periodo_global)
         datos.append({"Margen": f"{m}%", "Precio": f"${r['precio_final']:,.2f}", "Ganancia": f"${r['ganancia']:,.2f}", "ISR": f"${r['isr']:,.2f}"})
     
     st.dataframe(pd.DataFrame(datos), use_container_width=True, hide_index=True)
@@ -197,16 +225,14 @@ with tab3:
 # TAB 4: SENSIBILIDAD
 with tab4:
     st.subheader("📉 Análisis de Sensibilidad")
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     with c1:
         costo_sens = st.number_input("Costo", 700.0, step=10.0, key="s_costo")
     with c2:
         util_sens = st.number_input("Utilidad", 30.0, step=1.0, key="s_util", max_value=200.0)
-    with c3:
-        per_sens = st.selectbox("Período", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4, key="s_per")
     
     vars = [-20, -15, -10, -5, 0, 5, 10, 15, 20]
-    precios = [calcular_precio(costo_sens * (1 + v/100), util_sens, per_sens)['precio_final'] for v in vars]
+    precios = [calcular_precio(costo_sens * (1 + v/100), util_sens, regimen, periodo_global)['precio_final'] for v in vars]
     
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=[f"{v:+d}%" for v in vars], y=precios, mode='lines+markers', 
@@ -228,12 +254,10 @@ with tab5:
             u = st.number_input(f"Utilidad", 30.0, step=1.0, key=f"m_u{i}", max_value=200.0)
             datos_multi.append({"num": i+1, "costo": c, "util": u})
     
-    per_multi = st.selectbox("Período", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4, key="m_per")
-    
     if st.button("📊 Comparar"):
         tabla = []
         for p in datos_multi:
-            r = calcular_precio(p["costo"], p["util"], per_multi)
+            r = calcular_precio(p["costo"], p["util"], regimen, periodo_global)
             tabla.append({
                 "Producto": f"#{p['num']}", "Costo": f"${p['costo']:,.2f}",
                 "Precio": f"${r['precio_final']:,.2f}", "Ganancia": f"${r['ganancia']:,.2f}",
@@ -244,13 +268,9 @@ with tab5:
 # TAB 6: PUNTO EQUILIBRIO
 with tab6:
     st.subheader("⚖️ Punto de Equilibrio")
-    c1, c2 = st.columns(2)
-    with c1:
-        costo_eq = st.number_input("Costo", 700.0, step=10.0, key="eq_costo")
-    with c2:
-        per_eq = st.selectbox("Período", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4, key="eq_per")
+    costo_eq = st.number_input("Costo", 700.0, step=10.0, key="eq_costo")
     
-    res_eq = calcular_precio(costo_eq, 0, per_eq)
+    res_eq = calcular_precio(costo_eq, 0, regimen, periodo_global)
     
     m1, m2, m3 = st.columns(3)
     m1.metric("Costo", f"${costo_eq:,.2f}")
@@ -258,6 +278,37 @@ with tab6:
     m3.metric("ISR", f"${res_eq['isr']:,.2f}")
     
     st.success(f"🎯 Debes vender a mínimo **${res_eq['precio_final']:.2f}** para no perder")
+
+# TAB 7: TABLAS ISR
+with tab7:
+    st.subheader("📚 Desglose de Tablas de ISR / Retención")
+    resumen_regimenes = [
+        {
+            "Régimen": "Régimen General (Persona Moral)",
+            "Tipo": "ISR corporativo fijo",
+            "Tasa": "30.0%",
+            "Base": "Utilidad fiscal",
+        },
+        {
+            "Régimen": "Persona Física (Actividad Empresarial)",
+            "Tipo": "Tarifa progresiva Art. 152",
+            "Tasa": "1.92% a 35%",
+            "Base": "Ingreso por período",
+        },
+    ]
+    st.dataframe(pd.DataFrame(resumen_regimenes), use_container_width=True, hide_index=True)
+
+    periodo_tabla = st.selectbox("Ver tabla Art. 152 por período", PERIODOS_ISR, index=4, key="tabla_periodo")
+    tabla_tarifas = []
+    for fila in TARIFAS_ISR_2026[periodo_tabla]:
+        limite_sup = "En adelante" if fila["limite_sup"] == float('inf') else f"{fila['limite_sup']:,.2f}"
+        tabla_tarifas.append({
+            "Límite inferior": f"{fila['limite_inf']:,.2f}",
+            "Límite superior": limite_sup,
+            "Cuota fija": f"{fila['cuota']:,.2f}",
+            "Tasa marginal": f"{fila['tasa']:.2f}%",
+        })
+    st.dataframe(pd.DataFrame(tabla_tarifas), use_container_width=True, hide_index=True)
 
 # SIDEBAR HISTORIAL
 with st.sidebar:

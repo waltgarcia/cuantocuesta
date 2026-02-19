@@ -2,62 +2,32 @@ import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
+from datetime import datetime
+import urllib.parse
 
 # Configurar página
 st.set_page_config(
-    page_title="Calculadora de Costos - Monterrey",
+    page_title="Calculadora de Costos SAT 2026",
     page_icon="💰",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Paleta de colores moderna y profesional
+# Paleta de colores
 COLORES = {
-    "principal": "#1f77b4",      # Azul profesional
-    "utilidad": "#2ca02c",        # Verde éxito
-    "isr": "#d62728",             # Rojo impuesto
-    "iva": "#ff7f0e",             # Naranja cálido
-    "fondo": "#f8f9fa",           # Gris muy claro
-    "texto": "#1a1a1a",           # Negro/Gris oscuro
-    "acento": "#00d4ff"           # Cyan brillante
+    "principal": "#1f77b4", "utilidad": "#2ca02c", "isr": "#d62728",
+    "iva": "#ff7f0e", "fondo": "#f8f9fa", "texto": "#1a1a1a", "acento": "#00d4ff"
 }
 
-# CSS personalizado para mejor presentación
-st.markdown(f"""
-    <style>
-    .main {{
-        background-color: {COLORES['fondo']};
-    }}
-    .metric-card {{
-        padding: 20px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        text-align: center;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
+st.markdown(f"<style>.main {{ background-color: {COLORES['fondo']}; }}</style>", unsafe_allow_html=True)
 
-st.title("💰 Calculadora de Costo Real del Producto")
-st.write(
-    "🇲🇽 Calcula el precio final de tu producto o servicio según regulaciones fiscales del SAT en México.\n"
-    "Optimizada para empresas y profesionales independientes que requieren afianzar sus costos operativos."
-)
+# Inicializar session state
+if 'historial' not in st.session_state:
+    st.session_state.historial = []
 
-# Información fiscal de México
-st.info(
-    "📋 **Información Fiscal de México (SAT 2026)**\n"
-    "- **IVA:** 16% (tasa general)\n"
-    "- **ISR:** Tarifas progresivas según ingreso (actualizadas Art. 152 LISR)\n\n"
-    "⚠️ **Nota:** Esta calculadora es una herramienta orientativa. Consulta con tu contador o asesor fiscal para validar específicamente tu situación."
-)
-
-# Tarifas ISR 2026 - Artículo 152 LISR
-# Tarifas actualizadas conforme a la inflación acumulada que superó el 10%
-
+# TARIFAS ISR 2026 - Artículo 152 LISR
 TARIFAS_ISR_2026 = {
-    "Diaria": [
-        {"limite_inf": 0.01, "limite_sup": 27.78, "cuota": 0, "tasa": 1.92},
+    "Diaria": [{"limite_inf": 0.01, "limite_sup": 27.78, "cuota": 0, "tasa": 1.92},
         {"limite_inf": 27.79, "limite_sup": 235.81, "cuota": 0.53, "tasa": 6.4},
         {"limite_inf": 235.82, "limite_sup": 414.41, "cuota": 13.85, "tasa": 10.88},
         {"limite_inf": 414.42, "limite_sup": 481.73, "cuota": 33.28, "tasa": 16.0},
@@ -67,10 +37,8 @@ TARIFAS_ISR_2026 = {
         {"limite_inf": 1833.45, "limite_sup": 3500.35, "cuota": 343.98, "tasa": 30.0},
         {"limite_inf": 3500.36, "limite_sup": 4667.13, "cuota": 844.05, "tasa": 32.0},
         {"limite_inf": 4667.14, "limite_sup": 14001.38, "cuota": 1217.42, "tasa": 34.0},
-        {"limite_inf": 14001.39, "limite_sup": float('inf'), "cuota": 4391.07, "tasa": 35.0},
-    ],
-    "Semanal": [
-        {"limite_inf": 0.01, "limite_sup": 194.46, "cuota": 0, "tasa": 1.92},
+        {"limite_inf": 14001.39, "limite_sup": float('inf'), "cuota": 4391.07, "tasa": 35.0}],
+    "Semanal": [{"limite_inf": 0.01, "limite_sup": 194.46, "cuota": 0, "tasa": 1.92},
         {"limite_inf": 194.47, "limite_sup": 1650.67, "cuota": 3.71, "tasa": 6.4},
         {"limite_inf": 1650.68, "limite_sup": 2900.87, "cuota": 96.95, "tasa": 10.88},
         {"limite_inf": 2900.88, "limite_sup": 3372.11, "cuota": 232.96, "tasa": 16.0},
@@ -80,10 +48,8 @@ TARIFAS_ISR_2026 = {
         {"limite_inf": 12834.09, "limite_sup": 24502.45, "cuota": 2407.86, "tasa": 30.0},
         {"limite_inf": 24502.46, "limite_sup": 32669.91, "cuota": 5908.35, "tasa": 32.0},
         {"limite_inf": 32669.92, "limite_sup": 98009.66, "cuota": 8521.94, "tasa": 34.0},
-        {"limite_inf": 98009.67, "limite_sup": float('inf'), "cuota": 30737.49, "tasa": 35.0},
-    ],
-    "Decenal": [
-        {"limite_inf": 0.01, "limite_sup": 277.8, "cuota": 0, "tasa": 1.92},
+        {"limite_inf": 98009.67, "limite_sup": float('inf'), "cuota": 30737.49, "tasa": 35.0}],
+    "Decenal": [{"limite_inf": 0.01, "limite_sup": 277.8, "cuota": 0, "tasa": 1.92},
         {"limite_inf": 277.81, "limite_sup": 2358.10, "cuota": 5.3, "tasa": 6.4},
         {"limite_inf": 2358.11, "limite_sup": 4144.10, "cuota": 138.5, "tasa": 10.88},
         {"limite_inf": 4144.11, "limite_sup": 4817.30, "cuota": 332.8, "tasa": 16.0},
@@ -93,10 +59,8 @@ TARIFAS_ISR_2026 = {
         {"limite_inf": 18334.41, "limite_sup": 35003.50, "cuota": 3439.80, "tasa": 30.0},
         {"limite_inf": 35003.51, "limite_sup": 46671.30, "cuota": 8440.50, "tasa": 32.0},
         {"limite_inf": 46671.31, "limite_sup": 140013.80, "cuota": 12174.20, "tasa": 34.0},
-        {"limite_inf": 140013.81, "limite_sup": float('inf'), "cuota": 43910.70, "tasa": 35.0},
-    ],
-    "Quincenal": [
-        {"limite_inf": 0.01, "limite_sup": 416.7, "cuota": 0, "tasa": 1.92},
+        {"limite_inf": 140013.81, "limite_sup": float('inf'), "cuota": 43910.70, "tasa": 35.0}],
+    "Quincenal": [{"limite_inf": 0.01, "limite_sup": 416.7, "cuota": 0, "tasa": 1.92},
         {"limite_inf": 416.71, "limite_sup": 3537.15, "cuota": 7.95, "tasa": 6.4},
         {"limite_inf": 3537.16, "limite_sup": 6216.15, "cuota": 207.75, "tasa": 10.88},
         {"limite_inf": 6216.16, "limite_sup": 7225.95, "cuota": 499.2, "tasa": 16.0},
@@ -106,10 +70,8 @@ TARIFAS_ISR_2026 = {
         {"limite_inf": 27501.61, "limite_sup": 52505.25, "cuota": 5159.70, "tasa": 30.0},
         {"limite_inf": 52505.26, "limite_sup": 70006.95, "cuota": 12660.75, "tasa": 32.0},
         {"limite_inf": 70006.96, "limite_sup": 210020.70, "cuota": 18261.30, "tasa": 34.0},
-        {"limite_inf": 210020.71, "limite_sup": float('inf'), "cuota": 65866.05, "tasa": 35.0},
-    ],
-    "Mensual": [
-        {"limite_inf": 0.01, "limite_sup": 844.59, "cuota": 0, "tasa": 1.92},
+        {"limite_inf": 210020.71, "limite_sup": float('inf'), "cuota": 65866.05, "tasa": 35.0}],
+    "Mensual": [{"limite_inf": 0.01, "limite_sup": 844.59, "cuota": 0, "tasa": 1.92},
         {"limite_inf": 844.60, "limite_sup": 7168.51, "cuota": 16.22, "tasa": 6.4},
         {"limite_inf": 7168.52, "limite_sup": 12598.02, "cuota": 420.95, "tasa": 10.88},
         {"limite_inf": 12598.03, "limite_sup": 14644.64, "cuota": 1011.68, "tasa": 16.0},
@@ -119,353 +81,195 @@ TARIFAS_ISR_2026 = {
         {"limite_inf": 55736.69, "limite_sup": 106410.50, "cuota": 10457.09, "tasa": 30.0},
         {"limite_inf": 106410.51, "limite_sup": 141880.66, "cuota": 25659.23, "tasa": 32.0},
         {"limite_inf": 141880.67, "limite_sup": 425641.99, "cuota": 37009.69, "tasa": 34.0},
-        {"limite_inf": 425642.00, "limite_sup": float('inf'), "cuota": 133488.54, "tasa": 35.0},
-    ]
+        {"limite_inf": 425642.00, "limite_sup": float('inf'), "cuota": 133488.54, "tasa": 35.0}]
 }
 
 def calcular_isr_progresivo(ingreso, periodo):
-    """
-    Calcula el ISR según tarifas progresivas 2026 (Art. 152 LISR)
-    
-    Args:
-        ingreso: Monto del ingreso a gravar
-        periodo: "Diaria", "Semanal", "Decenal", "Quincenal" o "Mensual"
-    
-    Returns:
-        Monto de ISR a pagar
-    """
     tarifas = TARIFAS_ISR_2026.get(periodo, TARIFAS_ISR_2026["Mensual"])
-    
     for tarifa in tarifas:
         if tarifa["limite_inf"] <= ingreso <= tarifa["limite_sup"]:
-            isr = tarifa["cuota"] + ((ingreso - tarifa["limite_inf"]) * tarifa["tasa"] / 100)
-            return isr
-    
+            return tarifa["cuota"] + ((ingreso - tarifa["limite_inf"]) * tarifa["tasa"] / 100)
     return 0
 
-st.divider()
+def calcular_precio(costo_base, porcentaje_utilidad, periodo_isr):
+    utilidad_deseada = costo_base * (porcentaje_utilidad / 100)
+    utilidad_ajustada = utilidad_deseada
+    for _ in range(10):
+        isr_calc = calcular_isr_progresivo(costo_base + utilidad_ajustada, periodo_isr)
+        nuevo_val = utilidad_deseada + isr_calc
+        if abs(nuevo_val - utilidad_ajustada) < 0.01:
+            break
+        utilidad_ajustada = nuevo_val
+    
+    subtotal = costo_base + utilidad_ajustada
+    return {
+        "precio_final": subtotal * 1.16,
+        "subtotal": subtotal,
+        "iva": subtotal * 0.16,
+        "isr": calcular_isr_progresivo(subtotal, periodo_isr),
+        "ganancia": utilidad_deseada
+    }
 
-# Selección de período de cálculo para tarifas progresivas
-st.subheader("📅 Configuración fiscal")
+st.title("💰 Calculadora de Costo Real - SAT 2026")
+st.write("🇲🇽 ISR Progresivo (Art. 152 LISR) | IVA 16%")
 
-col1, col2 = st.columns(2)
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 Normal", "🎯 Objetivo", "📈 Dinámica", "📉 Sensibilidad", "🛒 Multi", "⚖️ Equilibrio"])
 
-with col1:
-    periodo_isr = st.selectbox(
-        "Período de cálculo ISR (Art. 152 LISR):",
-        ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"],
-        index=4,  # Mensual por defecto
-        help="Tarifas progresivas actualizadas conforme a inflación acumulada >10%"
-    )
+# TAB 1: CÁLCULO NORMAL
+with tab1:
+    st.subheader("Cálculo Normal")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        costo = st.number_input("💵 Costo ($)", value=700.0, step=10.0)
+    with c2:
+        util = st.number_input("📈 Utilidad (%)", value=30.0, step=1.0, max_value=200.0)
+    with c3:
+        periodo = st.selectbox("📅 Período", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4)
+    
+    res = calcular_precio(costo, util, periodo)
+    
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Precio Final", f"${res['precio_final']:,.2f}")
+    m2.metric("Ganancia", f"${res['ganancia']:,.2f}")
+    m3.metric("ISR", f"${res['isr']:,.2f}")
+    m4.metric("IVA", f"${res['iva']:,.2f}")
+    
+    col_hist, col_share = st.columns(2)
+    with col_hist:
+        if st.button("💾 Guardar Historial"):
+            st.session_state.historial.append({
+                "fecha": datetime.now().strftime("%d/%m %H:%M"),
+                "costo": costo, "util": util, "precio": res['precio_final']
+            })
+            st.success("✅ Guardado")
+    
+    with col_share:
+        st.subheader("📱 Compartir")
+        msg = f"Calculadora SAT: ${costo} → ${res['precio_final']:.2f}"
+        c1, c2 = st.columns(2)
+        with c1:
+            wa = f"https://wa.me/?text={urllib.parse.quote(msg)}"
+            st.markdown(f"[📲 WhatsApp]({wa})")
+        with c2:
+            em = f"mailto:?subject=Cálculo&body={urllib.parse.quote(msg)}"
+            st.markdown(f"[✉️ Email]({em})")
 
-with col2:
-    st.metric("Período seleccionado", periodo_isr)
-
-# Mostrar información sobre las tarifas progresivas
-with st.expander("ℹ️ Información sobre tarifas ISR 2026 (Art. 152 LISR)"):
-    st.write(
-        """
-        Estas tarifas se actualizaron conforme a lo previsto en el artículo 152 de la **Ley del ISR (LISR)**, 
-        que contempla un ajuste cada vez que la inflación sobrepasa un **10%**.
+# TAB 2: PRECIO OBJETIVO
+with tab2:
+    st.subheader("🎯 Inversor de Fórmula")
+    st.write("Precio → Costo Base máximo")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        precio_obj = st.number_input("💰 Precio deseado", value=1000.0, step=10.0, key="p_obj")
+    with c2:
+        util_obj = st.number_input("📈 Utilidad", value=30.0, step=1.0, key="u_obj", max_value=200.0)
+    with c3:
+        per_obj = st.selectbox("P", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4, key="per_obj")
+    
+    if st.button("🔄 Calcular"):
+        costo_max = precio_obj / 1.16 * 0.6
+        for _ in range(20):
+            res_temp = calcular_precio(costo_max, util_obj, per_obj)
+            if abs(res_temp['precio_final'] - precio_obj) < 1:
+                break
+            costo_max += (precio_obj - res_temp['precio_final']) / 2.16
         
-        **Las tarifas varían según:**
-        - Tu ingreso total
-        - El período fiscal (diario, semanal, decenal, quincenal o mensual)
-        
-        **Sistema progresivo:**
-        - Cuota fija + porcentaje sobre el excedente del límite inferior
-        - Mayor ingreso = mayor tasa de impuesto
-        """
-    )
+        res_obj = calcular_precio(costo_max, util_obj, per_obj)
+        st.metric("Costo Base Máximo", f"${costo_max:,.2f}")
+        st.metric("Precio Resultante", f"${res_obj['precio_final']:,.2f}")
+
+# TAB 3: TABLA DINÁMICA
+with tab3:
+    st.subheader("📈 Comparativo de Márgenes")
+    c1, c2 = st.columns(2)
+    with c1:
+        costo_tabla = st.number_input("Costo", 700.0, step=10.0, key="t_costo")
+    with c2:
+        per_tabla = st.selectbox("Período", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4, key="t_per")
     
-    # Mostrar tabla de la tarifa seleccionada
-    st.write(f"\n**Tabla de Tarifa {periodo_isr} ISR 2026:**")
+    datos = []
+    for m in [10, 15, 20, 25, 30, 35, 40, 50]:
+        r = calcular_precio(costo_tabla, m, per_tabla)
+        datos.append({"Margen": f"{m}%", "Precio": f"${r['precio_final']:,.2f}", "Ganancia": f"${r['ganancia']:,.2f}", "ISR": f"${r['isr']:,.2f}"})
     
-    tarifas_df = pd.DataFrame(TARIFAS_ISR_2026[periodo_isr])
+    st.dataframe(pd.DataFrame(datos), use_container_width=True, hide_index=True)
+
+# TAB 4: SENSIBILIDAD
+with tab4:
+    st.subheader("📉 Análisis de Sensibilidad")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        costo_sens = st.number_input("Costo", 700.0, step=10.0, key="s_costo")
+    with c2:
+        util_sens = st.number_input("Utilidad", 30.0, step=1.0, key="s_util", max_value=200.0)
+    with c3:
+        per_sens = st.selectbox("Período", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4, key="s_per")
     
-    # Formatear para mostrar
-    tarifas_display = tarifas_df.copy()
-    tarifas_display["limite_inf"] = tarifas_display["limite_inf"].apply(lambda x: f"${x:,.2f}")
-    tarifas_display["limite_sup"] = tarifas_display["limite_sup"].apply(
-        lambda x: "En adelante" if x == float('inf') else f"${x:,.2f}"
-    )
-    tarifas_display["cuota"] = tarifas_display["cuota"].apply(lambda x: f"${x:,.2f}")
-    tarifas_display["tasa"] = tarifas_display["tasa"].apply(lambda x: f"{x}%")
+    vars = [-20, -15, -10, -5, 0, 5, 10, 15, 20]
+    precios = [calcular_precio(costo_sens * (1 + v/100), util_sens, per_sens)['precio_final'] for v in vars]
     
-    tarifas_display.columns = ["Límite Inferior", "Límite Superior", "Cuota Fija", "% Sobre Excedente"]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=[f"{v:+d}%" for v in vars], y=precios, mode='lines+markers', 
+        line=dict(color=COLORES['principal'], width=3), marker=dict(size=8)))
+    fig.update_layout(title="Variación de Precio por Cambios en Costo", xaxis_title="Variación", yaxis_title="Precio ($)", height=400)
+    st.plotly_chart(fig, use_container_width=True)
+
+# TAB 5: MULTI-PRODUCTO
+with tab5:
+    st.subheader("🛒 Múltiples Productos")
+    num = st.number_input("Cantidad", 1, 5, 2)
     
-    st.dataframe(tarifas_display, use_container_width=True, hide_index=True)
+    datos_multi = []
+    cols = st.columns(num)
+    for i, col in enumerate(cols):
+        with col:
+            st.write(f"**Producto {i+1}**")
+            c = st.number_input(f"Costo", 500+i*200, step=10.0, key=f"m_c{i}")
+            u = st.number_input(f"Utilidad", 30.0, step=1.0, key=f"m_u{i}", max_value=200.0)
+            datos_multi.append({"num": i+1, "costo": c, "util": u})
+    
+    per_multi = st.selectbox("Período", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4, key="m_per")
+    
+    if st.button("📊 Comparar"):
+        tabla = []
+        for p in datos_multi:
+            r = calcular_precio(p["costo"], p["util"], per_multi)
+            tabla.append({
+                "Producto": f"#{p['num']}", "Costo": f"${p['costo']:,.2f}",
+                "Precio": f"${r['precio_final']:,.2f}", "Ganancia": f"${r['ganancia']:,.2f}",
+                "Margen": f"{(r['ganancia']/r['precio_final']*100):.1f}%"
+            })
+        st.dataframe(pd.DataFrame(tabla), use_container_width=True, hide_index=True)
+
+# TAB 6: PUNTO EQUILIBRIO
+with tab6:
+    st.subheader("⚖️ Punto de Equilibrio")
+    c1, c2 = st.columns(2)
+    with c1:
+        costo_eq = st.number_input("Costo", 700.0, step=10.0, key="eq_costo")
+    with c2:
+        per_eq = st.selectbox("Período", ["Diaria", "Semanal", "Decenal", "Quincenal", "Mensual"], index=4, key="eq_per")
+    
+    res_eq = calcular_precio(costo_eq, 0, per_eq)
+    
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Costo", f"${costo_eq:,.2f}")
+    m2.metric("Precio Mínimo (P.E.)", f"${res_eq['precio_final']:,.2f}")
+    m3.metric("ISR", f"${res_eq['isr']:,.2f}")
+    
+    st.success(f"🎯 Debes vender a mínimo **${res_eq['precio_final']:.2f}** para no perder")
+
+# SIDEBAR HISTORIAL
+with st.sidebar:
+    st.subheader("📜 Historial")
+    if st.session_state.historial:
+        df_h = pd.DataFrame(st.session_state.historial)
+        st.dataframe(df_h, use_container_width=True, hide_index=True)
+        if st.button("🗑️ Limpiar"):
+            st.session_state.historial = []
+            st.rerun()
+    else:
+        st.info("Sin cálculos guardados")
 
 st.divider()
-
-# Tasas según regulaciones SAT de México 2026
-tasa_iva = 16.0  # IVA fijo en México
-iva_decimal = tasa_iva / 100
-
-# Crear columnas para entrada de datos
-col1, col2 = st.columns(2)
-
-with col1:
-    # Paso 1: Costo base
-    costo_base = st.number_input(
-        "💵 Costo base del producto ($)",
-        min_value=0.0,
-        value=700.0,
-        step=10.0,
-        format="%.2f"
-    )
-
-with col2:
-    # Porcentaje de utilidad deseada
-    porcentaje_utilidad = st.number_input(
-        "📈 Porcentaje de utilidad deseado (%)",
-        min_value=0.0,
-        max_value=200.0,
-        value=30.0,
-        step=1.0,
-        format="%.1f"
-    )
-
-st.divider()
-
-st.write("**ℹ️ Información de cálculo:**")
-st.write(f"- **Período de cálculo ISR:** {periodo_isr}")
-st.write(f"- **Tasa IVA (SAT):** {tasa_iva}%")
-st.write("- **Sistema ISR:** Tarifas progresivas conforme Art. 152 LISR")
-
-st.divider()
-
-# Realizar cálculos automáticamente
-utilidad_pct = porcentaje_utilidad / 100
-
-# Paso 1: Calcular utilidad deseada inicial
-utilidad_deseada = costo_base * utilidad_pct
-
-# Paso 2: Usar método iterativo para encontrar la utilidad ajustada por ISR progresivo
-# Como ISR es progresivo, necesitamos iterar hasta converger
-utilidad_ajustada = utilidad_deseada
-for _ in range(10):  # Iteraciones para convergencia
-    subtotal_temp = costo_base + utilidad_ajustada
-    isr_calculado = calcular_isr_progresivo(subtotal_temp, periodo_isr)
-    utilidad_ajustada_nueva = utilidad_deseada + isr_calculado
-    
-    # Si la diferencia es mínima, convergimos
-    if abs(utilidad_ajustada_nueva - utilidad_ajustada) < 0.01:
-        break
-    utilidad_ajustada = utilidad_ajustada_nueva
-
-# Paso 3: Calcular subtotal (precio sin IVA)
-subtotal = costo_base + utilidad_ajustada
-
-# Paso 4: Calcular ISR final
-isr_a_pagar = calcular_isr_progresivo(subtotal, periodo_isr)
-
-# Paso 5: Calcular IVA
-iva = subtotal * iva_decimal
-
-# Paso 6: Calcular precio final
-precio_final = subtotal + iva
-
-# Mostrar desglose de cálculos
-st.success("✅ Cálculo realizado automáticamente con tarifas progresivas ISR 2026")
-
-st.subheader("📋 Desglose detallado:")
-
-st.divider()
-
-# Paso 1
-st.write("**Paso 1: Costo base**")
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.write("Costo de producción")
-with col2:
-    st.write(f"${costo_base:,.2f}")
-
-st.divider()
-
-# Paso 2
-st.write("**Paso 2: Utilidad y ajuste por ISR progresivo**")
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.write(f"Utilidad deseada ({porcentaje_utilidad}%)")
-with col2:
-    st.write(f"${utilidad_deseada:,.2f}")
-
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.write(f"Ajuste por ISR (Tarifa {periodo_isr})")
-with col2:
-    st.write(f"${isr_a_pagar:,.2f}")
-
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.write(f"Utilidad ajustada")
-with col2:
-    st.write(f"${utilidad_ajustada:,.2f}")
-
-st.divider()
-
-# Paso 3
-st.write("**Paso 3: Subtotal (precio sin IVA)**")
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.write("Costo + Utilidad ajustada")
-with col2:
-    st.write(f"${subtotal:,.2f}")
-
-st.divider()
-
-# Paso 4
-st.write("**Paso 4: Impuesto al Valor Agregado (IVA)**")
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.write(f"IVA ({tasa_iva}% del subtotal)")
-with col2:
-    st.write(f"${iva:,.2f}")
-
-st.divider()
-
-# Paso 5 - Resultado final
-st.write("**Paso 5: PRECIO FINAL AL PÚBLICO**")
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.write("**Subtotal + IVA**")
-with col2:
-    st.metric(label="", value=f"${precio_final:,.2f}")
-
-st.divider()
-
-# Resumen de ganancia neta
-st.subheader("💵 Resumen de ganancias:")
-
-ganancia_neta = utilidad_deseada
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.metric("Utilidad neta deseada", f"${ganancia_neta:,.2f}")
-
-with col2:
-    st.metric("ISR a pagar", f"${isr_a_pagar:,.2f}")
-
-with col3:
-    st.metric("IVA recaudado", f"${iva:,.2f}")
-
-st.divider()
-
-# Visualizaciones del desglose de costos
-st.subheader("📊 Visualización del desglose de costos")
-
-# Datos para los gráficos con paleta de colores moderna
-componentes = ["Costo Base", "Utilidad (Ganancia)", "ISR (Impuesto)", "IVA (Impuesto)"]
-montos = [costo_base, ganancia_neta, isr_a_pagar, iva]
-colores = [COLORES["principal"], COLORES["utilidad"], COLORES["isr"], COLORES["iva"]]
-
-# Crear dos columnas para los gráficos
-col_pie, col_bar = st.columns(2)
-
-with col_pie:
-    # Gráfico de pastel con colores modernos
-    fig_pie = go.Figure(data=[go.Pie(
-        labels=componentes,
-        values=montos,
-        marker=dict(
-            colors=colores,
-            line=dict(color='white', width=2)
-        ),
-        textposition='inside',
-        textinfo='label+percent',
-        hovertemplate='<b>%{label}</b><br>Monto: $%{value:,.2f}<br>Porcentaje: %{percent}<extra></extra>'
-    )])
-    
-    fig_pie.update_layout(
-        title="Composición del Precio Final",
-        height=450,
-        font=dict(size=11, family="Arial"),
-        showlegend=True,
-        paper_bgcolor='rgba(248, 249, 250, 0.5)',
-        plot_bgcolor='rgba(248, 249, 250, 0.5)',
-        hovermode='closest'
-    )
-    
-    st.plotly_chart(fig_pie, use_container_width=True)
-
-with col_bar:
-    # Gráfico de barras con colores modernos
-    fig_bar = go.Figure(data=[
-        go.Bar(
-            x=componentes,
-            y=montos,
-            marker=dict(
-                color=colores,
-                line=dict(color='white', width=2)
-            ),
-            text=[f"${monto:,.2f}" for monto in montos],
-            textposition='auto',
-            hovertemplate='<b>%{x}</b><br>Monto: $%{y:,.2f}<extra></extra>',
-            showlegend=False
-        )
-    ])
-    
-    fig_bar.update_layout(
-        title="Desglose de Costos en Dinero",
-        xaxis_title="Componentes",
-        yaxis_title="Monto ($)",
-        height=450,
-        showlegend=False,
-        hovermode='x unified',
-        paper_bgcolor='rgba(248, 249, 250, 0.5)',
-        plot_bgcolor='rgba(248, 249, 250, 0.5)',
-        font=dict(size=11, family="Arial"),
-        xaxis=dict(
-            showgrid=True,
-            gridwidth=1,
-            gridcolor='lightgray'
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridwidth=1,
-            gridcolor='lightgray'
-        )
-    )
-    
-    fig_bar.update_xaxes(tickangle=-45)
-    
-    st.plotly_chart(fig_bar, use_container_width=True)
-
-# Tabla de desglose detallado
-st.subheader("📈 Tabla de desglose detallado")
-
-desglose_data = {
-    "Componente": [
-        "Costo Base",
-        "Utilidad Deseada",
-        "ISR a Pagar",
-        "Subtotal (sin IVA)",
-        "IVA",
-        "Precio Final"
-    ],
-    "Monto": [
-        f"${costo_base:,.2f}",
-        f"${ganancia_neta:,.2f}",
-        f"${isr_a_pagar:,.2f}",
-        f"${subtotal:,.2f}",
-        f"${iva:,.2f}",
-        f"${precio_final:,.2f}"
-    ],
-    "Porcentaje del Precio Final": [
-        f"{(costo_base/precio_final)*100:.1f}%",
-        f"{(ganancia_neta/precio_final)*100:.1f}%",
-        f"{(isr_a_pagar/precio_final)*100:.1f}%",
-        f"{(subtotal/precio_final)*100:.1f}%",
-        f"{(iva/precio_final)*100:.1f}%",
-        "100%"
-    ]
-}
-
-st.dataframe(desglose_data, use_container_width=True, hide_index=True)
-
-st.divider()
-
-resumen_final = f"El precio final de ${precio_final:,.2f} te permite obtener una ganancia neta de ${ganancia_neta:,.2f} después de pagar el ISR de ${isr_a_pagar:,.2f} calculado con tarifas progresivas de la tarifa {periodo_isr}.\n\nEsta calculadora está optimizada para pequeños y medianos negocios, profesionales independientes y empresas que venden productos o servicios en México, utilizando las tarifas actualizadas conforme al Art. 152 LISR."
-st.info(f"📌 Resumen:\n{resumen_final}")
+st.markdown("📌 La información fiscal es orientativa. Consulta con tu contador.")

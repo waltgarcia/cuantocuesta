@@ -11,66 +11,29 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Paleta de colores moderna y vibrante
+# Paleta de colores moderna y profesional
 COLORES = {
-    "principal": "#0066ff",       # Azul vibrante
-    "utilidad": "#00d084",        # Verde esmeralda
-    "isr": "#ff6b6b",             # Rojo coral
-    "iva": "#ffa500",             # Naranja brillante
-    "fondo": "#0a0e27",           # Azul oscuro (tema oscuro elegante)
-    "fondo_card": "#15172b",      # Gris azulado oscuro
-    "texto": "#e8eef7",           # Blanco frío
-    "acento": "#00d4ff",          # Cyan brillante
-    "dorado": "#ffd700"           # Dorado
+    "principal": "#1f77b4",      # Azul profesional
+    "utilidad": "#2ca02c",        # Verde éxito
+    "isr": "#d62728",             # Rojo impuesto
+    "iva": "#ff7f0e",             # Naranja cálido
+    "fondo": "#f8f9fa",           # Gris muy claro
+    "texto": "#1a1a1a",           # Negro/Gris oscuro
+    "acento": "#00d4ff"           # Cyan brillante
 }
 
-# CSS personalizado con tema oscuro elegante
+# CSS personalizado para mejor presentación
 st.markdown(f"""
     <style>
-    * {{
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }}
     .main {{
-        background: linear-gradient(135deg, {COLORES['fondo']} 0%, #1a1f3a 100%);
-        color: {COLORES['texto']};
-    }}
-    [data-testid="stHeader"] {{
-        background-color: transparent;
+        background-color: {COLORES['fondo']};
     }}
     .metric-card {{
         padding: 20px;
-        border-radius: 15px;
+        border-radius: 10px;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         text-align: center;
-        box-shadow: 0 8px 16px rgba(0, 100, 255, 0.3);
-    }}
-    [data-testid="stMetricValue"] {{
-        color: {COLORES['dorado']};
-        font-weight: bold;
-    }}
-    [data-testid="stSidebar"] {{
-        background: linear-gradient(180deg, {COLORES['fondo_card']} 0%, {COLORES['fondo']} 100%);
-    }}
-    .stTabs [role="tablist"] button {{
-        color: {COLORES['texto']};
-        border-radius: 10px;
-    }}
-    .stTabs [role="tablist"] button[aria-selected="true"] {{
-        background: linear-gradient(90deg, {COLORES['principal']} 0%, {COLORES['acento']} 100%);
-        color: white;
-    }}
-    .stExpander {{
-        background-color: {COLORES['fondo_card']};
-        border-radius: 10px;
-        border: 1px solid rgba(0, 212, 255, 0.2);
-    }}
-    .stDataFrame {{
-        background-color: {COLORES['fondo_card']};
-        border-radius: 10px;
-    }}
-    hr {{
-        border-color: rgba(0, 212, 255, 0.2);
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -393,81 +356,76 @@ st.divider()
 # Visualizaciones del desglose de costos
 st.subheader("📊 Visualización del desglose de costos")
 
-# Datos para los gráficos con paleta de colores vibrante
+# Datos para los gráficos con paleta de colores moderna
 componentes = ["Costo Base", "Utilidad (Ganancia)", "ISR (Impuesto)", "IVA (Impuesto)"]
 montos = [costo_base, ganancia_neta, isr_a_pagar, iva]
-colores_gradient = [COLORES["principal"], COLORES["utilidad"], COLORES["isr"], COLORES["iva"]]
-colores_borde = ["#0052cc", "#00a86b", "#e53935", "#ff8c00"]
+colores = [COLORES["principal"], COLORES["utilidad"], COLORES["isr"], COLORES["iva"]]
 
 # Crear dos columnas para los gráficos
 col_pie, col_bar = st.columns(2)
 
 with col_pie:
-    # Gráfico de pastel con colores vibrantes
+    # Gráfico de pastel con colores modernos
     fig_pie = go.Figure(data=[go.Pie(
         labels=componentes,
         values=montos,
         marker=dict(
-            colors=colores_gradient,
-            line=dict(color='#0a0e27', width=3)
+            colors=colores,
+            line=dict(color='white', width=2)
         ),
         textposition='inside',
         textinfo='label+percent',
-        hovertemplate='<b>%{label}</b><br>Monto: $%{value:,.2f}<br>Porcentaje: %{percent}<extra></extra>',
-        textfont=dict(size=12, color='white', family='Arial Black')
+        hovertemplate='<b>%{label}</b><br>Monto: $%{value:,.2f}<br>Porcentaje: %{percent}<extra></extra>'
     )])
     
     fig_pie.update_layout(
-        title=dict(text="Composición del Precio Final", font=dict(size=16, color=COLORES['dorado'])),
+        title="Composición del Precio Final",
         height=450,
-        font=dict(size=11, family="Arial", color=COLORES['texto']),
+        font=dict(size=11, family="Arial"),
         showlegend=True,
-        paper_bgcolor='rgba(10, 14, 39, 0)',
-        plot_bgcolor='rgba(10, 14, 39, 0)',
-        hovermode='closest',
-        legend=dict(font=dict(size=10, color=COLORES['texto']))
+        paper_bgcolor='rgba(248, 249, 250, 0.5)',
+        plot_bgcolor='rgba(248, 249, 250, 0.5)',
+        hovermode='closest'
     )
     
     st.plotly_chart(fig_pie, use_container_width=True)
 
 with col_bar:
-    # Gráfico de barras con colores vibrantes y sombra
+    # Gráfico de barras con colores modernos
     fig_bar = go.Figure(data=[
         go.Bar(
             x=componentes,
             y=montos,
             marker=dict(
-                color=colores_gradient,
-                line=dict(color=colores_borde, width=2),
-                opacity=0.85
+                color=colores,
+                line=dict(color='white', width=2)
             ),
             text=[f"${monto:,.2f}" for monto in montos],
             textposition='auto',
-            textfont=dict(size=11, color='white', family='Arial Black'),
             hovertemplate='<b>%{x}</b><br>Monto: $%{y:,.2f}<extra></extra>',
             showlegend=False
         )
     ])
     
     fig_bar.update_layout(
-        title=dict(text="Desglose de Costos en Dinero", font=dict(size=16, color=COLORES['dorado'])),
+        title="Desglose de Costos en Dinero",
         xaxis_title="Componentes",
         yaxis_title="Monto ($)",
         height=450,
         showlegend=False,
         hovermode='x unified',
-        paper_bgcolor='rgba(10, 14, 39, 0)',
-        plot_bgcolor='rgba(10, 14, 39, 0)',
-        font=dict(size=11, family="Arial", color=COLORES['texto']),
+        paper_bgcolor='rgba(248, 249, 250, 0.5)',
+        plot_bgcolor='rgba(248, 249, 250, 0.5)',
+        font=dict(size=11, family="Arial"),
         xaxis=dict(
-            showgrid=False,
-            color=COLORES['texto']
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='lightgray'
         ),
         yaxis=dict(
             showgrid=True,
             gridwidth=1,
-            gridcolor='rgba(0, 212, 255, 0.1)',
-            color=COLORES['texto']
+            gridcolor='lightgray'
         )
     )
     

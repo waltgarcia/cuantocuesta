@@ -224,7 +224,7 @@ with tab5:
     for i, col in enumerate(cols):
         with col:
             st.write(f"**Producto {i+1}**")
-            c = st.number_input(f"Costo", 500+i*200, step=10.0, key=f"m_c{i}")
+            c = st.number_input(f"Costo", 500.0+i*200.0, step=10.0, key=f"m_c{i}")
             u = st.number_input(f"Utilidad", 30.0, step=1.0, key=f"m_u{i}", max_value=200.0)
             datos_multi.append({"num": i+1, "costo": c, "util": u})
     
